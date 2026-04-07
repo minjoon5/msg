@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Messenger</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; } 
+    body {
+        font-family: 'Pretendard', sans-serif;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        min-height: 100vh; background: #eef2f7;
+    } 
+
+    /* 로그인 화면 개선 */
+    #login-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: #eef2f7; display: flex; flex-direction: column;
+        justify-content: center; align-items: center; z-index: 1000;
+    }
+    .login-card {
+        background: white; padding: 2.5rem; border-radius: 20px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1); text-align: center; width: 350px;
+    }
+    .login-card h2 { margin-bottom: 1.5rem; color: #3a7bd5; font-size: 1.4rem; }
+    .login-card input {
+        width: 100%; padding: 12px; border-radius: 10px;
+        border: 2px solid #eee; margin-bottom: 1rem; outline: none;
+    }
+    .login-btn-group { display: flex; gap: 10px; }
+    .login-btn-group button {
+        flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer;
+    }
+    .btn-user { background: #3a7bd5; color: white; }
+    .btn-admin { background: #555; color: white; }
+
+    /* 메인 컨테이너 */
+    .container {
+        display: none; background: white; border-radius: 20px; width: 400px; height: 650px;
+        flex-direction: column; box-shadow: 0 8px 30px rgba(0,0,0,0.1); overflow: hidden;
+        position: relative;
+    } 
+
+    .header { 
+        background: #3a7bd5; color: white; padding: 1.2rem; 
+        text-align: center; font-weight: bold; font-size: 1.2rem;
+        display: flex; justify-content: center; align-items: center; position: relative;
+    }
+    
+    /* 관리자 전용 초기화 버튼 */
+    #adminResetBtn {
+        display: none; position: absolute; right: 15px; font-size: 0.7rem;
+        background: rgba(255,255,255,0.2); border: 1px solid white; color: white;
+        padding: 4px 8px; border-radius: 5px; cursor: pointer;
+    }
+
+    #chatWindow { 
+        flex: 1; overflow-y: auto; padding: 1.2rem; background: #f8f9fb; 
+        display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .msg-box { max-width: 80%; display: flex; flex-direction: column; position: relative; }
+    .msg-content { padding: 10px 14px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; word-break: break-all; }
+    
+    .received { align-self: flex-start; }
+    .received .msg-content { background: white; color: #333; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    
+    .sent { align-self: flex-end; }
+    .sent .msg-content { background: #3a7bd5; color: white; border-bottom-right-radius: 2px; }
+    
+    /* 관리자일 때 모든 메시지에 커서 포인터 적용 */
+    .admin-mode .msg-content { cursor: pointer; }
+    .sent .msg-content { cursor: pointer; }
+
+    .msg-footer { font-size: 0.65rem; color: #aaa; margin-top: 4px; display: flex; gap: 4px; }
+    .sent .msg-footer { justify-content: flex-end; }
+    .deleted-msg { color: #ccc !important; font-style: italic; background: #f0f0f0 !important; cursor: default !important; }
+
+    .input-area { padding: 1rem; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; }
+    #messageInput { flex: 1; padding: 12px 15px; border-radius: 25px; border: 1px solid #e0e0e0; outline: none; }
+    #sendBtn { padding: 0 20px; background: #3a7bd5; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
+
+    /* 커스텀 모달 */
+    #actionModal {
+        display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.4); z-index: 500; justify-content: center; align-items: center;
+    }
+    .modal-content { background: white; border-radius: 15px; width: 280px; padding: 1.5rem; box-shadow: 0 5px 20px rgba(0,0,0,0.2); text-align: center; }
+    .modal-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 1rem; }
+    .modal-btns button { padding: 10px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; font-family: inherit; }
+    .btn-edit { background: #3a7bd5; color: white; }
+    .btn-delete { background: #ff4d4d; color: white; }
+    .btn-cancel { background: #eee; color: #777; }
+
+    #copyright { margin-top: 1.2rem; font-size: 0.75rem; color: #bbb; text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="login-card">
+        <h2>Messenger</h2>
+        <input type="password" id="passInput" placeholder="비밀번호 입력">
+        <div class="login-btn-group">
+            <button class="btn-user" onclick="login('user')">입장하기</button>
+            <button class="btn-admin" onclick="login('admin')">관리자</button>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="mainContainer">
+    <div class="header">
+        <span id="titleLabel">Messenger</span>
+        <button id="adminResetBtn" onclick="resetAllMessages()">초기화</button>
+    </div>
+    <div id="chatWindow"></div>
+    <div class="input-area">
+        <input type="text" id="messageInput" placeholder="메시지를 입력하세요...">
+        <button id="sendBtn" onclick="sendMessage()">전송</button>
+    </div>
+
+    <div id="actionModal">
+        <div class="modal-content">
+            <h3 id="modalTitle">메시지 관리</h3>
+            <div class="modal-btns">
+                <button class="btn-edit" id="modalEdit">수정하기</button>
+                <button class="btn-delete" id="modalDelete">삭제하기</button>
+                <button class="btn-cancel" onclick="closeModal()">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="copyright">copyright &copy; 2026. 민준<br>All rights reserved.</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded, onChildChanged, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAOCZ5bXWJzq0waQoCqUyTCOgT0lG7cGC4",
+        authDomain: "messenger-mj5.firebaseapp.com",
+        databaseURL: "https://messenger-mj5-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "messenger-mj5",
+        storageBucket: "messenger-mj5.firebasestorage.app",
+        messagingSenderId: "812229641172",
+        appId: "1:812229641172:web:0c3a5601c80b6d7edf4c41"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const messagesRef = ref(db, 'messages');
+    const myId = localStorage.getItem('chat_uid') || 'user_' + Math.floor(Math.random() * 10000);
+    localStorage.setItem('chat_uid', myId);
+
+    let isAdmin = false;
+    let selectedMsgId = null;
+    let selectedMsgText = "";
+
+    // 로그인 로직
+    window.login = (role) => {
+        const pw = document.getElementById("passInput").value;
+        if (role === 'admin') {
+            if (pw === "6402") {
+                isAdmin = true;
+                document.getElementById("adminResetBtn").style.display = "block";
+                document.getElementById("mainContainer").classList.add("admin-mode");
+                document.getElementById("titleLabel").innerText = "Messenger (Admin)";
+                enterApp();
+            } else { alert("관리자 비밀번호가 틀렸습니다."); }
+        } else {
+            if (pw === "minjoon5") {
+                enterApp();
+            } else { alert("비밀번호가 틀렸습니다."); }
+        }
+    };
+
+    function enterApp() {
+        document.getElementById("login-overlay").style.display = "none";
+        document.getElementById("mainContainer").style.display = "flex";
+        startListening();
+    }
+
+    // 메시지 전송
+    window.sendMessage = () => {
+        const input = document.getElementById("messageInput");
+        const text = input.value.trim();
+        if (text !== "") {
+            const now = new Date();
+            const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+            push(messagesRef, {
+                sender: myId,
+                text: text,
+                timeDisplay: timeStr,
+                isDeleted: false,
+                isEdited: false
+            });
+            input.value = "";
+        }
+    };
+    document.getElementById("messageInput").onkeypress = (e) => { if(e.keyCode === 13) sendMessage(); };
+
+    // 관리자 전용 전체 초기화
+    window.resetAllMessages = () => {
+        if (confirm("⚠️ 모든 대화 기록을 기록 없이 삭제(초기화)하시겠습니까?")) {
+            remove(messagesRef);
+            location.reload(); // 화면 새로고침
+        }
+    };
+
+    // 모달 관리
+    window.openModal = (msgId, currentText) => {
+        selectedMsgId = msgId;
+        selectedMsgText = currentText;
+        document.getElementById("actionModal").style.display = "flex";
+    };
+    window.closeModal = () => { document.getElementById("actionModal").style.display = "none"; };
+
+    document.getElementById("modalEdit").onclick = () => {
+        const newText = prompt("내용 수정:", selectedMsgText);
+        if (newText && newText !== selectedMsgText) {
+            update(ref(db, `messages/${selectedMsgId}`), { text: newText, isEdited: true });
+        }
+        closeModal();
+    };
+
+    document.getElementById("modalDelete").onclick = () => {
+        if (confirm("메시지를 삭제하시겠습니까?")) {
+            update(ref(db, `messages/${selectedMsgId}`), { text: "삭제된 메세지 입니다.", isDeleted: true });
+        }
+        closeModal();
+    };
+
+    // UI 렌더링
+    const renderMessage = (msgId, data) => {
+        if (!data) { // 삭제(초기화)된 경우 해당 엘리먼트 제거
+            const el = document.getElementById(msgId);
+            if (el) el.remove();
+            return;
+        }
+        let existingMsg = document.getElementById(msgId);
+        const isMine = data.sender === myId;
+        
+        const html = `
+            <div class="msg-content ${data.isDeleted ? 'deleted-msg' : ''}" 
+                 ${(isAdmin || (isMine && !data.isDeleted)) ? `onclick="openModal('${msgId}', '${data.text}')"` : ''}>
+                ${data.text}
+            </div>
+            <div class="msg-footer">
+                <span>${data.timeDisplay}</span>
+                ${data.isEdited && !data.isDeleted ? '<span style="color:#3a7bd5;">(수정됨)</span>' : ''}
+            </div>
+        `;
+
+        if (existingMsg) {
+            existingMsg.innerHTML = html;
+        } else {
+            const msgBox = document.createElement("div");
+            msgBox.id = msgId;
+            msgBox.className = `msg-box ${isMine ? 'sent' : 'received'}`;
+            msgBox.innerHTML = html;
+            document.getElementById("chatWindow").appendChild(msgBox);
+        }
+        document.getElementById("chatWindow").scrollTop = document.getElementById("chatWindow").scrollHeight;
+    };
+
+    function startListening() {
+        onChildAdded(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
+        onChildChanged(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
+        // 전체 삭제(초기화) 감지
+        onValue(messagesRef, (snap) => {
+            if (!snap.exists()) document.getElementById("chatWindow").innerHTML = "";
+        });
+    }
+</script>
+</body>
+</html>
