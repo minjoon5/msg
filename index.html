@@ -61,7 +61,12 @@
     }
 
     .msg-box { max-width: 80%; display: flex; flex-direction: column; position: relative; }
-    .msg-content { padding: 10px 14px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; word-break: break-all; }
+    
+    /* 줄바꿈 인식을 위해 white-space: pre-wrap; 추가 */
+    .msg-content { 
+        padding: 10px 14px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; 
+        word-break: break-all; white-space: pre-wrap; 
+    } 
     
     .received { align-self: flex-start; }
     .received .msg-content { background: white; color: #333; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
@@ -77,9 +82,13 @@
     .sent .msg-footer { justify-content: flex-end; }
     .deleted-msg { color: #ccc !important; font-style: italic; background: #f0f0f0 !important; cursor: default !important; }
 
-    .input-area { padding: 1rem; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; }
-    #messageInput { flex: 1; padding: 12px 15px; border-radius: 25px; border: 1px solid #e0e0e0; outline: none; }
-    #sendBtn { padding: 0 20px; background: #3a7bd5; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
+    /* 여러 줄 입력을 위해 input을 textarea로 변경하고 스타일 보완 */
+    .input-area { padding: 1rem; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; align-items: flex-end; }
+    #messageInput { 
+        flex: 1; padding: 10px 15px; border-radius: 15px; border: 1px solid #e0e0e0; 
+        outline: none; resize: none; height: 42px; font-family: inherit; font-size: 0.95rem;
+    }
+    #sendBtn { padding: 0 20px; background: #3a7bd5; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; height: 42px; }
 
     /* 커스텀 모달 */
     #actionModal {
@@ -116,7 +125,7 @@
     </div>
     <div id="chatWindow"></div>
     <div class="input-area">
-        <input type="text" id="messageInput" placeholder="메시지를 입력하세요...">
+        <textarea id="messageInput" placeholder="메시지를 입력하세요..."></textarea>
         <button id="sendBtn" onclick="sendMessage()">전송</button>
     </div>
 
@@ -199,7 +208,15 @@
             input.value = "";
         }
     };
-    document.getElementById("messageInput").onkeypress = (e) => { if(e.keyCode === 13) sendMessage(); };
+
+    // [수정된 키 이벤트 처리] 
+    // Shift + Enter는 기본 줄바꿈 허용, 그냥 Enter만 누르면 전송
+    document.getElementById("messageInput").onkeydown = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault(); // 엔터 입력 시 기본 줄바꿈(기본 동작)을 막음
+            sendMessage();
+        }
+    };
 
     // 관리자 전용 전체 초기화
     window.resetAllMessages = () => {
@@ -244,7 +261,7 @@
         
         const html = `
             <div class="msg-content ${data.isDeleted ? 'deleted-msg' : ''}" 
-                 ${(isAdmin || (isMine && !data.isDeleted)) ? `onclick="openModal('${msgId}', '${data.text}')"` : ''}>
+                 ${(isAdmin || (isMine && !data.isDeleted)) ? `onclick="openModal('${msgId}', '${data.text.replace(/'/g, "\\'")}')"` : ''}>
                 ${data.text}
             </div>
             <div class="msg-footer">
