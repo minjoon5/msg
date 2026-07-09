@@ -194,6 +194,8 @@
     // 메시지 전송
     window.sendMessage = () => {
         const input = document.getElementById("messageInput");
+        if (!input) return; // 엘리먼트가 존재할 때만 실행
+        
         const text = input.value.trim();
         if (text !== "") {
             const now = new Date();
@@ -209,20 +211,23 @@
         }
     };
 
-    // [수정된 키 이벤트 처리] 
-    // Shift + Enter는 기본 줄바꿈 허용, 그냥 Enter만 누르면 전송
-    document.getElementById("messageInput").onkeydown = (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault(); // 엔터 입력 시 기본 줄바꿈(기본 동작)을 막음
-            sendMessage();
+    // 로그인 후 화면이 열린 뒤에만 키 입력 이벤트가 작동하도록 스크립트 수정
+    // 텍스트창(messageInput)이 활성화되어 있을 때만 이벤트를 받으므로 무한 튕김/먹통 현상이 해결됩니다.
+    document.addEventListener("keydown", (e) => {
+        const msgInput = document.getElementById("messageInput");
+        if (document.activeElement === msgInput) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault(); 
+                sendMessage();
+            }
         }
-    };
+    });
 
     // 관리자 전용 전체 초기화
     window.resetAllMessages = () => {
         if (confirm("⚠️ 모든 대화 기록을 기록 없이 삭제(초기화)하시겠습니까?")) {
             remove(messagesRef);
-            location.reload(); // 화면 새로고침
+            location.reload(); 
         }
     };
 
@@ -251,7 +256,7 @@
 
     // UI 렌더링
     const renderMessage = (msgId, data) => {
-        if (!data) { // 삭제(초기화)된 경우 해당 엘리먼트 제거
+        if (!data) { 
             const el = document.getElementById(msgId);
             if (el) el.remove();
             return;
@@ -259,9 +264,12 @@
         let existingMsg = document.getElementById(msgId);
         const isMine = data.sender === myId;
         
+        // 줄바꿈 문자 처리를 안전하게 하기 위한 이스케이프
+        const safeText = data.text ? data.text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') : '';
+
         const html = `
             <div class="msg-content ${data.isDeleted ? 'deleted-msg' : ''}" 
-                 ${(isAdmin || (isMine && !data.isDeleted)) ? `onclick="openModal('${msgId}', '${data.text.replace(/'/g, "\\'")}')"` : ''}>
+                 ${(isAdmin || (isMine && !data.isDeleted)) ? `onclick="openModal('${msgId}', '${safeText}')"` : ''}>
                 ${data.text}
             </div>
             <div class="msg-footer">
@@ -285,7 +293,6 @@
     function startListening() {
         onChildAdded(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
         onChildChanged(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
-        // 전체 삭제(초기화) 감지
         onValue(messagesRef, (snap) => {
             if (!snap.exists()) document.getElementById("chatWindow").innerHTML = "";
         });
