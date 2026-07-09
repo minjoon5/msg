@@ -61,12 +61,8 @@
     }
 
     .msg-box { max-width: 80%; display: flex; flex-direction: column; position: relative; }
-    
-    /* 줄바꿈 인식을 위해 white-space: pre-wrap; 추가 */
-    .msg-content { 
-        padding: 10px 14px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; 
-        word-break: break-all; white-space: pre-wrap; 
-    } 
+    /* 줄바꿈 인식을 위해 white-space: pre-wrap; 속성 추가 */
+    .msg-content { padding: 10px 14px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; word-break: break-all; white-space: pre-wrap; }
     
     .received { align-self: flex-start; }
     .received .msg-content { background: white; color: #333; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
@@ -82,13 +78,10 @@
     .sent .msg-footer { justify-content: flex-end; }
     .deleted-msg { color: #ccc !important; font-style: italic; background: #f0f0f0 !important; cursor: default !important; }
 
-    /* 여러 줄 입력을 위해 input을 textarea로 변경하고 스타일 보완 */
-    .input-area { padding: 1rem; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; align-items: flex-end; }
-    #messageInput { 
-        flex: 1; padding: 10px 15px; border-radius: 15px; border: 1px solid #e0e0e0; 
-        outline: none; resize: none; height: 42px; font-family: inherit; font-size: 0.95rem;
-    }
-    #sendBtn { padding: 0 20px; background: #3a7bd5; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; height: 42px; }
+    .input-area { padding: 1rem; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; }
+    /* 줄바꿈을 여러 줄 입력할 수 있도록 input에서 textarea로 변경할 수 있으나, 레이아웃 유지를 위해 input의 기본 스타일을 따르는 textarea로 마크업을 매칭함 */
+    #messageInput { flex: 1; padding: 12px 15px; border-radius: 25px; border: 1px solid #e0e0e0; outline: none; resize: none; height: 45px; font-family: inherit; }
+    #sendBtn { padding: 0 20px; background: #3a7bd5; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
 
     /* 커스텀 모달 */
     #actionModal {
@@ -194,8 +187,6 @@
     // 메시지 전송
     window.sendMessage = () => {
         const input = document.getElementById("messageInput");
-        if (!input) return; // 엘리먼트가 존재할 때만 실행
-        
         const text = input.value.trim();
         if (text !== "") {
             const now = new Date();
@@ -211,23 +202,19 @@
         }
     };
 
-    // 로그인 후 화면이 열린 뒤에만 키 입력 이벤트가 작동하도록 스크립트 수정
-    // 텍스트창(messageInput)이 활성화되어 있을 때만 이벤트를 받으므로 무한 튕김/먹통 현상이 해결됩니다.
-    document.addEventListener("keydown", (e) => {
-        const msgInput = document.getElementById("messageInput");
-        if (document.activeElement === msgInput) {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault(); 
-                sendMessage();
-            }
-        }
-    });
+    // 키보드 이벤트 핸들러 수정: Shift + Enter 입력 시 전송, 그냥 Enter는 줄바꿈 허용
+    document.getElementById("messageInput").onkeydown = (e) => { 
+        if (e.keyCode === 13 && e.shiftKey) { 
+            e.preventDefault(); // 기본 줄바꿈 동작 방지
+            sendMessage(); 
+        } 
+    };
 
     // 관리자 전용 전체 초기화
     window.resetAllMessages = () => {
         if (confirm("⚠️ 모든 대화 기록을 기록 없이 삭제(초기화)하시겠습니까?")) {
             remove(messagesRef);
-            location.reload(); 
+            location.reload(); // 화면 새로고침
         }
     };
 
@@ -256,7 +243,7 @@
 
     // UI 렌더링
     const renderMessage = (msgId, data) => {
-        if (!data) { 
+        if (!data) { // 삭제(초기화)된 경우 해당 엘리먼트 제거
             const el = document.getElementById(msgId);
             if (el) el.remove();
             return;
@@ -264,12 +251,9 @@
         let existingMsg = document.getElementById(msgId);
         const isMine = data.sender === myId;
         
-        // 줄바꿈 문자 처리를 안전하게 하기 위한 이스케이프
-        const safeText = data.text ? data.text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') : '';
-
         const html = `
             <div class="msg-content ${data.isDeleted ? 'deleted-msg' : ''}" 
-                 ${(isAdmin || (isMine && !data.isDeleted)) ? `onclick="openModal('${msgId}', '${safeText}')"` : ''}>
+                 ${(isAdmin || (isMine && !data.isDeleted)) ? `onclick="openModal('${msgId}', '${data.text}')"` : ''}>
                 ${data.text}
             </div>
             <div class="msg-footer">
@@ -293,6 +277,7 @@
     function startListening() {
         onChildAdded(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
         onChildChanged(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
+        // 전체 삭제(초기화) 감지
         onValue(messagesRef, (snap) => {
             if (!snap.exists()) document.getElementById("chatWindow").innerHTML = "";
         });
