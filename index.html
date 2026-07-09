@@ -61,7 +61,6 @@
     }
 
     .msg-box { max-width: 80%; display: flex; flex-direction: column; position: relative; }
-    /* 줄바꿈 인식을 위해 white-space: pre-wrap; 속성 추가 */
     .msg-content { padding: 10px 14px; border-radius: 15px; font-size: 0.95rem; line-height: 1.4; word-break: break-all; white-space: pre-wrap; }
     
     .received { align-self: flex-start; }
@@ -79,7 +78,6 @@
     .deleted-msg { color: #ccc !important; font-style: italic; background: #f0f0f0 !important; cursor: default !important; }
 
     .input-area { padding: 1rem; background: white; border-top: 1px solid #eee; display: flex; gap: 8px; }
-    /* 줄바꿈을 여러 줄 입력할 수 있도록 input에서 textarea로 변경할 수 있으나, 레이아웃 유지를 위해 input의 기본 스타일을 따르는 textarea로 마크업을 매칭함 */
     #messageInput { flex: 1; padding: 12px 15px; border-radius: 25px; border: 1px solid #e0e0e0; outline: none; resize: none; height: 45px; font-family: inherit; }
     #sendBtn { padding: 0 20px; background: #3a7bd5; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
 
@@ -202,19 +200,19 @@
         }
     };
 
-    // 키보드 이벤트 핸들러 수정: Shift + Enter 입력 시 전송, 그냥 Enter는 줄바꿈 허용
     document.getElementById("messageInput").onkeydown = (e) => { 
         if (e.keyCode === 13 && e.shiftKey) { 
-            e.preventDefault(); // 기본 줄바꿈 동작 방지
+            e.preventDefault(); 
             sendMessage(); 
         } 
     };
 
-    // 관리자 전용 전체 초기화
+    // 브라우저 튕김(unload 위반)을 방지하기 위해 location.reload() 제거 후 안전하게 처리
     window.resetAllMessages = () => {
         if (confirm("⚠️ 모든 대화 기록을 기록 없이 삭제(초기화)하시겠습니까?")) {
-            remove(messagesRef);
-            location.reload(); // 화면 새로고침
+            remove(messagesRef).then(() => {
+                document.getElementById("chatWindow").innerHTML = "";
+            });
         }
     };
 
@@ -243,7 +241,7 @@
 
     // UI 렌더링
     const renderMessage = (msgId, data) => {
-        if (!data) { // 삭제(초기화)된 경우 해당 엘리먼트 제거
+        if (!data) { 
             const el = document.getElementById(msgId);
             if (el) el.remove();
             return;
@@ -277,9 +275,11 @@
     function startListening() {
         onChildAdded(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
         onChildChanged(messagesRef, (snap) => renderMessage(snap.key, snap.val()));
-        // 전체 삭제(초기화) 감지
+        // 데이터 유무를 확인하여 화면 비우기
         onValue(messagesRef, (snap) => {
-            if (!snap.exists()) document.getElementById("chatWindow").innerHTML = "";
+            if (!snap.exists()) {
+                document.getElementById("chatWindow").innerHTML = "";
+            }
         });
     }
 </script>
